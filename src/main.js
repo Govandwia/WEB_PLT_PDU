@@ -40,10 +40,36 @@ function navigate() {
     cleanupCurrentPage = renderStep(app, isNaN(stepNum) ? 1 : stepNum);
   } else if (hash === '#/alat') {
     renderToolPage(app);
-  } else {
     window.location.hash = '#/';
   }
 }
 
+// Navigasi Mobile Menu
+function initNavToggle() {
+  const toggle = document.getElementById('nav-toggle');
+  const navbar = document.querySelector('.pdu-navbar');
+  if (!toggle || !navbar) return;
+
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    navbar.classList.toggle('menu-open');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!navbar.contains(e.target)) {
+      navbar.classList.remove('menu-open');
+    }
+  });
+
+  navbar.querySelectorAll('.nav-link, .nav-mobile-cta a').forEach(link => {
+    link.addEventListener('click', () => {
+      navbar.classList.remove('menu-open');
+    });
+  });
+}
+
 window.addEventListener('hashchange', navigate);
-window.addEventListener('DOMContentLoaded', navigate);
+window.addEventListener('DOMContentLoaded', () => {
+  initNavToggle();
+  navigate();
+});

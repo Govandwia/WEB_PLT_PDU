@@ -59,6 +59,7 @@ function toolBubbleMore() {
 }
 
 export function renderHome(root) {
+  let scene = null;
   document.title = 'PDU PLT Suite — Mengenal Production Logging Tool';
   root.innerHTML = `
     <section class="home-hero" id="home-hero">
@@ -68,6 +69,32 @@ export function renderHome(root) {
         ${LAYERS.map(l => `<span class="layer-tag" data-layer="${l.id}"><b>${l.name}</b> <small>${l.depth}</small></span>`).join('')}
       </div>
       <div class="bubble-layer" id="bubble-layer"></div>
+
+      <!-- KARTU PENJELASAN KOMPONEN AKTIF KHUSUS MOBILE (Anti-Tabrakan & Rapi) -->
+      <div class="mobile-component-card" id="mobile-component-card">
+        <div class="mcc-tabs" id="mcc-tabs">
+          ${BUBBLES.map((b, idx) => `
+            <button class="mcc-tab ${idx === 0 ? 'active' : ''}" data-idx="${idx}" type="button">
+              <span>${b.num}</span> ${b.title.split(' ')[0]}
+            </button>
+          `).join('')}
+        </div>
+        <div class="mcc-body">
+          <div class="mcc-nav-row">
+            <div class="mcc-badge">
+              <span id="mcc-num">1</span>
+              <b id="mcc-title">Rig (Menara)</b>
+            </div>
+            <div class="mcc-arrows">
+              <button class="mcc-arrow" id="mcc-prev" type="button" aria-label="Sebelumnya">‹</button>
+              <button class="mcc-arrow" id="mcc-next" type="button" aria-label="Berikutnya">›</button>
+            </div>
+          </div>
+          <p class="mcc-short" id="mcc-short">Menara tempat menggantung kabel untuk menurunkan alat ke dalam sumur.</p>
+          <div class="mcc-more" id="mcc-more"></div>
+          <button class="btn btn-ghost btn-sm mcc-toggle" id="mcc-toggle" type="button">Pelajari Lebih Lanjut</button>
+        </div>
+      </div>
 
       <!-- Petunjuk Scroll & Interaksi di Pojok Kiri Bawah -->
       <div class="hero-hint">
@@ -193,6 +220,16 @@ export function renderHome(root) {
       setExpanded(state, !el.classList.contains('expanded'));
     });
     el.querySelector('.bubble-head').addEventListener('click', () => setExpanded(state, !el.classList.contains('expanded')));
+
+    // Di mobile, klik pin memicu kartu komponen mobile aktif
+    el.addEventListener('click', (e) => {
+      if (window.innerWidth <= 768) {
+        e.stopPropagation();
+        const targetIdx = BUBBLES.findIndex(item => item.id === cfg.id);
+        if (targetIdx !== -1) updateMobileCard(targetIdx);
+      }
+    });
+
     return state;
   });
 
@@ -222,6 +259,98 @@ export function renderHome(root) {
   toolBubble.el.querySelectorAll('.sensor-item').forEach(btn => {
     btn.addEventListener('click', (e) => { e.stopPropagation(); selectSensor(btn.dataset.sensor); });
   });
+
+  /* ---------------- mobile component card controller ---------------- */
+  let currentMobileIdx = 0;
+  const mccCard = root.querySelector('#mobile-component-card');
+  const mccTabs = root.querySelector('#mcc-tabs');
+  const mccNum = root.querySelector('#mcc-num');
+  const mccTitle = root.querySelector('#mcc-title');
+  const mccShort = root.querySelector('#mcc-short');
+  const mccMore = root.querySelector('#mcc-more');
+  const mccToggle = root.querySelector('#mcc-toggle');
+
+  function updateMobileCard(idx) {
+    currentMobileIdx = idx;
+    const b = BUBBLES[idx];
+    if (!b) return;
+
+    // Aktifkan pin yang sesuai
+    bubbles.forEach((item, i) => item.el.classList.toggle('active', i === idx));
+
+    // Aktifkan tab pill
+    if (mccTabs) {
+      mccTabs.querySelectorAll('.mcc-tab').forEach((tab, i) => tab.classList.toggle('active', i === idx));
+    }
+
+    if (mccNum) mccNum.textContent = b.num;
+    if (mccTitle) mccTitle.textContent = b.title;
+    if (mccShort) mccShort.textContent = b.short;
+
+    if (mccMore) {
+      if (b.more === 'tool') {
+        mccMore.innerHTML = toolBubbleMore();
+        mccMore.querySelectorAll('.sensor-item').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const sid = btn.dataset.sensor;
+            mccMore.querySelectorAll('.sensor-item').forEach(x => x.classList.toggle('active', x.dataset.sensor === sid));
+            const s = SENSORS.find(x => x.id === sid);
+            const detail = mccMore.querySelector('[data-detail]');
+            if (s && detail) {
+              detail.innerHTML = `
+                <div class="sensor-detail-title" style="color:${s.color}">${s.name}</div>
+                <p>${s.desc}</p>
+                <p class="analogy"><b>Ibaratnya:</b> ${s.analogy}</p>
+                <p class="reading-sample">Contoh: <b>${s.reading}</b></p>`;
+            }
+            scene && scene.highlight(sid);
+          });
+        });
+      } else {
+        mccMore.innerHTML = `<p>${b.more}</p>`;
+      }
+    }
+
+    // Arahkan kedalaman alat jika memilih komponen bawah tanah
+    if (b.id === 'reservoir') {
+      scene && scene.goToReservoir();
+    } else if (b.id === 'rig' || b.id === 'truck' || b.id === 'cable') {
+      if (scene && scene.getFraction() > 0.3) {
+        scene.goToSurface();
+      }
+    }
+  }
+
+  if (mccCard) {
+    if (mccTabs) {
+      mccTabs.querySelectorAll('.mcc-tab').forEach(tab => {
+        tab.addEventListener('click', () => updateMobileCard(parseInt(tab.dataset.idx, 10)));
+      });
+    }
+
+    const prevBtn = root.querySelector('#mcc-prev');
+    const nextBtn = root.querySelector('#mcc-next');
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        const next = (currentMobileIdx - 1 + BUBBLES.length) % BUBBLES.length;
+        updateMobileCard(next);
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        const next = (currentMobileIdx + 1) % BUBBLES.length;
+        updateMobileCard(next);
+      });
+    }
+
+    if (mccToggle) {
+      mccToggle.addEventListener('click', () => {
+        const exp = mccCard.classList.toggle('expanded');
+        mccToggle.textContent = exp ? 'Tutup Penjelasan' : 'Pelajari Lebih Lanjut';
+      });
+    }
+  }
 
   /* ---------------- controls & telemetry ---------------- */
   const range = root.querySelector('#cp-range');
@@ -304,7 +433,35 @@ export function renderHome(root) {
   }
 
   function placeBubbles(anchors) {
-    const W = hero.clientWidth, H = hero.clientHeight;
+    const isMobile = window.innerWidth <= 768;
+    const sceneHostEl = root.querySelector('#scene-host');
+    const W = hero.clientWidth;
+    const H = isMobile ? (sceneHostEl ? sceneHostEl.clientHeight : 380) : hero.clientHeight;
+
+    if (isMobile) {
+      bubbles.forEach(b => {
+        const a = anchors[b.cfg.id];
+        if (!a) return;
+        const el = b.el;
+
+        if (a.y < 10 || a.y > H - 10 || a.x < -30 || a.x > W + 30) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          return;
+        }
+        el.style.opacity = '1';
+        el.style.pointerEvents = 'auto';
+
+        const px = Math.max(10, Math.min(W - 42, a.x - 16));
+        const py = Math.max(10, Math.min(H - 42, a.y - 16));
+        const isAct = el.classList.contains('active');
+        const scaleStr = isAct ? ' scale(1.22)' : '';
+        el.style.transform = `translate(${Math.round(px)}px, ${Math.round(py)}px)${scaleStr}`;
+      });
+      svg.innerHTML = '';
+      return;
+    }
+
     const heroRect = hero.getBoundingClientRect();
     const getObstacleRect = (el) => {
       if (!el) return null;
@@ -390,7 +547,7 @@ export function renderHome(root) {
     });
   }
 
-  const scene = new RigScene(root.querySelector('#scene-host'), {
+  scene = new RigScene(root.querySelector('#scene-host'), {
     onFrame: (f) => {
       placeBubbles(f.anchors);
       depthEl.textContent = fmt(f.depthFt);
@@ -413,6 +570,10 @@ export function renderHome(root) {
       selectSensor(sensorId);
     }
   });
+
+  if (mccCard) {
+    updateMobileCard(0);
+  }
 
   range.addEventListener('pointerdown', () => { draggingRange = true; });
   range.addEventListener('pointerup', () => { draggingRange = false; });

@@ -154,14 +154,24 @@ export class RigScene {
   _updateCamera() {
     const aspect = this.w / this.h;
     let viewH = VIEW_HEIGHT;
-    if (viewH * aspect < 56) viewH = 56 / aspect;
-    this.visW = viewH * aspect;
+    let targetX;
+
+    if (aspect <= 1.15) {
+      // Pada layar HP vertikal (aspect <= 1.15), zoom pas dan pusat di antara Rig & Winch Truck
+      viewH = 24;
+      this.visW = viewH * aspect;
+      targetX = this.wellX + 3.2;
+    } else {
+      const minW = aspect < 1.35 ? 44 : 56;
+      if (viewH * aspect < minW) viewH = minW / aspect;
+      this.visW = viewH * aspect;
+      const rigFraction = aspect < 1.3 ? 0.18 : 0.22;
+      targetX = this.wellX + this.visW * (0.5 - rigFraction);
+    }
+    this.centerX = targetX;
 
     const fov = THREE.MathUtils.degToRad(this.camera.fov);
     const dist = viewH / 2 / Math.tan(fov / 2);
-    // Letakkan rig di sepertiga kiri agar pemandangan sumur dan lapisan batuan luas ke kanan
-    const rigFraction = aspect < 1.2 ? 0.15 : 0.22;
-    this.centerX = this.wellX + this.visW * (0.5 - rigFraction);
 
     const target = new THREE.Vector3(this.centerX, this.currentCameraY, 0);
     const dir = new THREE.Vector3(
@@ -713,12 +723,12 @@ export class RigScene {
     const V = THREE.Vector3;
     const cableMid = this.drumTop.clone().lerp(new V(this.sheaveCenter.x + this.sheaveR, this.sheaveCenter.y, 0), 0.5);
     const anchors = {
-      rig: this._project(new V(this.wellX - 1.8, 11, 0)),
+      rig: this._project(new V(this.wellX - 1.2, 9.5, 0)),
       truck: this._project(new V(this.truckX - 1.5, 4.2, 0)),
       cable: this._project(cableMid),
-      casing: this._project(new V(this.wellX - 1.3, -5.5, 0)),
+      casing: this._project(new V(this.wellX - 1.2, -4.5, 0)),
       tool: this._project(new V(this.wellX + 0.6, toolCenter, 0)),
-      reservoir: this._project(new V(this.centerX + this.visW * 0.1, -25.5, 3))
+      reservoir: this._project(new V(this.wellX + 2.8, -25.5, 1))
     };
     LAYERS.forEach(l => {
       anchors['layer_' + l.id] = this._project(new V(this.centerX + this.visW * 0.35, (l.top + l.bottom) / 2, 3));
